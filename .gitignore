@@ -1,0 +1,33 @@
+# Python compilation files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+venv/
+env/
+.venv/
+.env
+
+# Database (Do not upload patient data!)
+*.db
+*.sqlite
+patients.db
+instance/
+
+# IDE & OS Metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Project Generated Files (Reports & CSVs)
+*.pdf
+OncoPredict_Results.csv
+OncoPredict_Report.pdf
+test_patients.csv
+report.pdf
+
+# Jupyter Notebook checkpoints (if you used notebooks)
+.ipynb_checkpoints/

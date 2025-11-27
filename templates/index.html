@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OncoPredict | Enterprise AI</title>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+      :root {
+        --primary: #0f172a;
+        --secondary: #334155;
+        --accent: #db2777;
+        --background: #f8fafc;
+        --surface: #ffffff;
+      }
+      body {
+        background-color: var(--background);
+        font-family: "Inter", sans-serif;
+        padding-bottom: 60px;
+      }
+      .navbar {
+        background: var(--surface);
+        padding: 1rem 0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      }
+
+      /* Tabs */
+      .main-tabs .nav-link {
+        color: var(--secondary);
+        font-weight: 600;
+        padding: 12px 24px;
+        border-radius: 8px;
+        transition: all 0.2s;
+      }
+      .main-tabs .nav-link.active {
+        background-color: var(--primary);
+        color: white;
+        box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.2);
+      }
+
+      /* Cards */
+      .clinical-card {
+        background: var(--surface);
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      }
+      .card-header-custom {
+        background: #fff;
+        padding: 20px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .form-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--secondary);
+        margin-bottom: 4px;
+        text-transform: capitalize;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+      }
+      .status-pill {
+        padding: 6px 16px;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 0.9rem;
+      }
+      .status-malignant {
+        background: #fee2e2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+      }
+      .status-benign {
+        background: #d1fae5;
+        color: #059669;
+        border: 1px solid #a7f3d0;
+      }
+
+      /* Upload Zone */
+      .upload-zone {
+        border: 2px dashed #cbd5e1;
+        border-radius: 12px;
+        padding: 40px;
+        text-align: center;
+        transition: all 0.3s;
+        cursor: pointer;
+        background: #f8fafc;
+      }
+      .upload-zone:hover,
+      .upload-zone.dragover {
+        border-color: var(--accent);
+        background: #fdf2f8;
+      }
+      .upload-icon {
+        font-size: 3rem;
+        color: #94a3b8;
+        margin-bottom: 15px;
+      }
+
+      .chart-box {
+        height: 300px;
+        position: relative;
+        width: 100%;
+      }
+      .table-custom th {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        color: var(--secondary);
+        background: #f1f5f9;
+      }
+      .table-custom td {
+        vertical-align: middle;
+        font-size: 0.9rem;
+        padding: 12px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div
+      id="loadingIndicator"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+      "
+    >
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="mt-3 fw-bold text-secondary" id="loadingText">Processing...</p>
+    </div>
+
+    <nav class="navbar mb-4">
+      <div class="container">
+        <span
+          class="navbar-brand fw-bold d-flex align-items-center gap-2"
+          style="color: var(--primary)"
+        >
+          <i
+            class="ph-fill ph-dna"
+            style="font-size: 1.5rem; color: var(--accent)"
+          ></i>
+          OncoPredict
+          <span style="font-weight: 300; opacity: 0.5"
+            >| Enterprise Edition</span
+          >
+        </span>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="row justify-content-center mb-4">
+        <div class="col-lg-8">
+          <ul
+            class="nav nav-pills nav-fill main-tabs bg-white p-1 rounded border"
+            id="mainTab"
+            role="tablist"
+          >
+            <li class="nav-item">
+              <button
+                class="nav-link active"
+                data-bs-toggle="pill"
+                data-bs-target="#pills-diagnosis"
+              >
+                <i class="ph ph-stethoscope me-2"></i>Single Assessment
+              </button>
+            </li>
+            <li class="nav-item">
+              <button
+                class="nav-link"
+                data-bs-toggle="pill"
+                data-bs-target="#pills-batch"
+              >
+                <i class="ph ph-files me-2"></i>Batch Analysis
+              </button>
+            </li>
+            <li class="nav-item">
+              <button
+                class="nav-link"
+                data-bs-toggle="pill"
+                data-bs-target="#pills-history"
+              >
+                <i class="ph ph-folder-user me-2"></i>Database Records
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="tab-content" id="pills-tabContent">
+        <div class="tab-pane fade show active" id="pills-diagnosis">
+          <div
+            id="errorAlert"
+            class="alert alert-danger"
+            style="display: none"
+          ></div>
+          <form id="predictForm">
+            <div class="clinical-card">
+              <div class="card-header-custom">
+                <h5 class="m-0 fw-bold">Clinical Inputs</h5>
+                <div class="d-flex gap-2">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    onclick="fillSampleData()"
+                  >
+                    Load Sample
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger"
+                    onclick="clearForm()"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+              <div class="p-4">
+                <div id="featureInputs" class="row g-3"></div>
+                <button
+                  type="submit"
+                  class="btn btn-primary w-100 mt-4 py-3 fw-bold"
+                >
+                  Run XGBoost Analysis
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <div id="resultBox" style="display: none">
+            <div
+              class="clinical-card border-top-0 border-3"
+              style="border-top-color: var(--accent) !important"
+            >
+              <div class="card-header-custom bg-light">
+                <h4 class="m-0 fw-bold text-primary">Diagnostic Report</h4>
+                <div class="d-flex gap-2">
+                  <button
+                    type="button"
+                    class="btn btn-success"
+                    onclick="openPDFModal()"
+                  >
+                    PDF Report
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary"
+                    onclick="resetPrediction()"
+                  >
+                    New Patient
+                  </button>
+                </div>
+              </div>
+              <div class="p-4">
+                <div class="row">
+                  <div class="col-lg-4 border-end">
+                    <div class="mb-4">
+                      <label class="small text-muted fw-bold text-uppercase"
+                        >AI Prediction</label
+                      >
+                      <div id="predLabel" class="mt-2"></div>
+                    </div>
+                    <div class="mb-4">
+                      <label class="small text-muted fw-bold text-uppercase"
+                        >Probability Score</label
+                      >
+                      <div
+                        class="display-6 fw-bold text-primary"
+                        id="confidenceScore"
+                      >
+                        0%
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-lg-8 ps-lg-4">
+                    <ul class="nav nav-tabs" id="vizTabs">
+                      <li class="nav-item">
+                        <button
+                          class="nav-link active"
+                          onclick="switchTab('overview')"
+                        >
+                          Overview
+                        </button>
+                      </li>
+                      <li class="nav-item">
+                        <button
+                          class="nav-link"
+                          onclick="switchTab('features')"
+                        >
+                          Features
+                        </button>
+                      </li>
+                      <li class="nav-item">
+                        <button
+                          class="nav-link"
+                          onclick="switchTab('comparison')"
+                        >
+                          Radar
+                        </button>
+                      </li>
+                      <li class="nav-item">
+                        <button
+                          class="nav-link"
+                          onclick="switchTab('reasoning')"
+                        >
+                          SHAP Analysis
+                        </button>
+                      </li>
+                    </ul>
+                    <div class="tab-content mt-3">
+                      <div
+                        id="overview"
+                        class="tab-pane active"
+                        style="display: block"
+                      >
+                        <div class="chart-box">
+                          <canvas id="confidenceChart"></canvas>
+                        </div>
+                      </div>
+                      <div id="features" class="tab-pane" style="display: none">
+                        <div class="chart-box">
+                          <canvas id="featureChart"></canvas>
+                        </div>
+                      </div>
+                      <div
+                        id="comparison"
+                        class="tab-pane"
+                        style="display: none"
+                      >
+                        <div class="chart-box">
+                          <canvas id="comparisonChart"></canvas>
+                        </div>
+                      </div>
+                      <div
+                        id="reasoning"
+                        class="tab-pane"
+                        style="display: none"
+                      >
+                        <div class="text-center">
+                          <img
+                            id="shapImage"
+                            class="img-fluid border rounded"
+                            style="max-height: 300px; display: none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-batch">
+          <div class="clinical-card">
+            <div class="card-header-custom">
+              <h5 class="m-0 fw-bold text-primary">Batch CSV Processing</h5>
+              <button
+                class="btn btn-sm btn-outline-primary"
+                onclick="downloadTemplate()"
+              >
+                Download Template CSV
+              </button>
+            </div>
+            <div class="p-5">
+              <div class="upload-zone" id="dropZone">
+                <i class="ph ph-upload-simple upload-icon"></i>
+                <h4>Drag & Drop CSV File Here</h4>
+                <p class="text-muted">or click to browse from your computer</p>
+                <input
+                  type="file"
+                  id="csvFileInput"
+                  accept=".csv"
+                  style="display: none"
+                />
+              </div>
+              <div class="mt-4 text-center">
+                <p class="small text-muted">
+                  Supports bulk analysis for up to 500 patients
+                  simultaneously.<br />The system will append 'Prediction' and
+                  'Confidence' columns to your file.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-history">
+          <div class="clinical-card">
+            <div class="card-header-custom">
+              <h5 class="m-0 fw-bold text-primary">Database Records</h5>
+              <button
+                class="btn btn-sm btn-light border"
+                onclick="loadHistory()"
+              >
+                <i class="ph ph-arrows-clockwise me-1"></i> Refresh
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover table-custom mb-0">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Timestamp</th>
+                    <th>Result</th>
+                    <th>Confidence</th>
+                    <th>Metrics</th>
+                  </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                  <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">
+                      Loading...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="pdfModal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(15, 23, 42, 0.7);
+        z-index: 3000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        class="bg-white p-4 rounded text-center shadow-lg"
+        style="width: 400px; border-radius: 12px"
+      >
+        <div id="pdfReady">
+          <i
+            class="ph-fill ph-file-pdf text-danger mb-3"
+            style="font-size: 3rem"
+          ></i>
+          <h4 class="mb-2">Generate PDF Report</h4>
+          <button
+            class="btn btn-primary w-100 py-2 mt-3"
+            onclick="generatePDF()"
+          >
+            Download Full Report
+          </button>
+          <button
+            class="btn btn-link text-muted mt-2 w-100"
+            style="text-decoration: none"
+            onclick="document.getElementById('pdfModal').style.display='none'"
+          >
+            Cancel
+          </button>
+        </div>
+        <div id="pdfProcessing" style="display: none">
+          <div class="spinner-border text-primary mb-3"></div>
+          <h5>Compiling...</h5>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+      const API_URL = "http://localhost:5000";
+      const features = [
+        "mean_radius",
+        "mean_texture",
+        "mean_perimeter",
+        "mean_area",
+        "mean_smoothness",
+        "mean_compactness",
+        "mean_concavity",
+        "mean_concave_points",
+        "mean_symmetry",
+        "mean_fractal_dimension",
+        "radius_error",
+        "texture_error",
+        "perimeter_error",
+        "area_error",
+        "smoothness_error",
+        "compactness_error",
+        "concavity_error",
+        "concave_points_error",
+        "symmetry_error",
+        "fractal_dimension_error",
+        "worst_radius",
+        "worst_texture",
+        "worst_perimeter",
+        "worst_area",
+        "worst_smoothness",
+        "worst_compactness",
+        "worst_concavity",
+        "worst_concave_points",
+        "worst_symmetry",
+        "worst_fractal_dimension",
+      ];
+
+      const benignAvg = {
+        mean_radius: 12.15,
+        mean_texture: 17.91,
+        mean_perimeter: 78.07,
+        mean_area: 462.79,
+        mean_smoothness: 0.092,
+        mean_compactness: 0.08,
+        mean_concavity: 0.046,
+        mean_concave_points: 0.02,
+      };
+      const maxVals = {
+        mean_radius: 28,
+        mean_texture: 40,
+        mean_perimeter: 190,
+        mean_area: 2500,
+        mean_smoothness: 0.16,
+      };
+      const sampleData = {
+        mean_radius: 17.99,
+        mean_texture: 10.38,
+        mean_perimeter: 122.8,
+        mean_area: 1001,
+        mean_smoothness: 0.1184,
+        mean_compactness: 0.2776,
+        mean_concavity: 0.3001,
+        mean_concave_points: 0.1471,
+        mean_symmetry: 0.2419,
+        mean_fractal_dimension: 0.07871,
+        radius_error: 1.095,
+        texture_error: 0.9053,
+        perimeter_error: 8.589,
+        area_error: 153.4,
+        smoothness_error: 0.006399,
+        compactness_error: 0.04904,
+        concavity_error: 0.05373,
+        concave_points_error: 0.01587,
+        symmetry_error: 0.03003,
+        fractal_dimension_error: 0.006193,
+        worst_radius: 25.38,
+        worst_texture: 17.33,
+        worst_perimeter: 184.6,
+        worst_area: 2019,
+        worst_smoothness: 0.1622,
+        worst_compactness: 0.6656,
+        worst_concavity: 0.7119,
+        worst_concave_points: 0.2654,
+        worst_symmetry: 0.4601,
+        worst_fractal_dimension: 0.1189,
+      };
+
+      let lastPrediction = null;
+      let charts = {};
+      let patientInputValues = [];
+
+      function init() {
+        const container = document.getElementById("featureInputs");
+        features.forEach((f) => {
+          const name = f
+            .replace(/_/g, " ")
+            .replace("mean", "")
+            .replace("worst", "")
+            .replace("error", "")
+            .trim();
+          const col = document.createElement("div");
+          col.className = "col-md-4 mb-2";
+          col.innerHTML = `<label class="form-label">${name}</label><input type="number" step="any" class="form-control" name="${f}" placeholder="0.00" required>`;
+          container.appendChild(col);
+        });
+        setupUpload();
+        loadHistory();
+      }
+
+      function fillSampleData() {
+        features.forEach((f) => {
+          const el = document.querySelector(`input[name="${f}"]`);
+          if (el) el.value = sampleData[f];
+        });
+      }
+      function clearForm() {
+        document.getElementById("predictForm").reset();
+        document.getElementById("resultBox").style.display = "none";
+      }
+      function resetPrediction() {
+        document.getElementById("resultBox").style.display = "none";
+        window.scrollTo(0, 0);
+      }
+      function openPDFModal() {
+        document.getElementById("pdfReady").style.display = "block";
+        document.getElementById("pdfProcessing").style.display = "none";
+        document.getElementById("pdfModal").style.display = "flex";
+      }
+      function switchTab(id) {
+        ["overview", "features", "comparison", "reasoning"].forEach(
+          (t) => (document.getElementById(t).style.display = "none")
+        );
+        document
+          .querySelectorAll("#vizTabs .nav-link")
+          .forEach((b) => b.classList.remove("active"));
+        document.getElementById(id).style.display = "block";
+        event.target.classList.add("active");
+      }
+
+      // --- HISTORY ---
+      async function loadHistory() {
+        try {
+          const res = await fetch(`${API_URL}/api/history`);
+          const data = await res.json();
+          const tbody = document.getElementById("historyTableBody");
+          tbody.innerHTML = "";
+          if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-5 text-muted">No records found.</td></tr>`;
+            return;
+          }
+          data.forEach((row) => {
+            const badge =
+              row.prediction === "Malignant"
+                ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Malignant</span>`
+                : `<span class="badge bg-success bg-opacity-10 text-success border border-success">Benign</span>`;
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td class="fw-bold text-primary">#${row.id}</td><td>${row.date}</td><td>${badge}</td><td>${row.confidence}%</td><td class="small text-muted">R: ${row.radius} / A: ${row.area}</td>`;
+            tbody.appendChild(tr);
+          });
+        } catch (e) {
+          console.error("History Error", e);
+        }
+      }
+
+      // --- SINGLE PREDICTION ---
+      document
+        .getElementById("predictForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const loader = document.getElementById("loadingIndicator");
+          loader.style.display = "flex";
+          const formData = new FormData(e.target);
+          patientInputValues = features.map((f) => parseFloat(formData.get(f)));
+
+          try {
+            const res = await fetch(`${API_URL}/predict`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ data: patientInputValues }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+
+            lastPrediction = data;
+            const patientMap = {};
+            features.forEach((f, i) => (patientMap[f] = patientInputValues[i]));
+
+            document.getElementById("resultBox").style.display = "block";
+            const isMal = data.label === "Malignant";
+            document.getElementById("predLabel").innerHTML = isMal
+              ? `<span class="status-pill status-malignant">Malignant Detected</span>`
+              : `<span class="status-pill status-benign">Benign Indication</span>`;
+            document.getElementById("confidenceScore").textContent =
+              data.probability.toFixed(1) + "%";
+
+            const shapImg = document.getElementById("shapImage");
+            if (data.explanation_image) {
+              shapImg.src = "data:image/png;base64," + data.explanation_image;
+              shapImg.style.display = "block";
+            } else {
+              shapImg.style.display = "none";
+            }
+
+            if (charts.conf) charts.conf.destroy();
+            charts.conf = new Chart(
+              document.getElementById("confidenceChart"),
+              {
+                type: "doughnut",
+                data: {
+                  labels: [data.label, "Uncertainty"],
+                  datasets: [
+                    {
+                      data: [
+                        data.probability * 100,
+                        100 - data.probability * 100,
+                      ],
+                      backgroundColor: [
+                        isMal ? "#dc2626" : "#059669",
+                        "#e2e8f0",
+                      ],
+                      borderWidth: 0,
+                    },
+                  ],
+                },
+                options: { cutout: "70%", maintainAspectRatio: false },
+              }
+            );
+            if (charts.feat) charts.feat.destroy();
+            charts.feat = new Chart(document.getElementById("featureChart"), {
+              type: "bar",
+              data: {
+                labels: ["Mean Radius", "Mean Texture", "Mean Concavity"],
+                datasets: [
+                  {
+                    label: "Patient",
+                    data: [
+                      patientMap.mean_radius,
+                      patientMap.mean_texture,
+                      patientMap.mean_concavity * 100,
+                    ],
+                    backgroundColor: "#0f172a",
+                    borderRadius: 4,
+                  },
+                  {
+                    label: "Benign Avg",
+                    data: [
+                      benignAvg.mean_radius,
+                      benignAvg.mean_texture,
+                      benignAvg.mean_concavity * 100,
+                    ],
+                    backgroundColor: "#94a3b8",
+                    borderRadius: 4,
+                  },
+                ],
+              },
+              options: {
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true } },
+              },
+            });
+            if (charts.comp) charts.comp.destroy();
+            const norm = (val, max) => (val / max) * 100;
+            charts.comp = new Chart(
+              document.getElementById("comparisonChart"),
+              {
+                type: "radar",
+                data: {
+                  labels: [
+                    "Radius",
+                    "Texture",
+                    "Perimeter",
+                    "Area",
+                    "Smoothness",
+                  ],
+                  datasets: [
+                    {
+                      label: "Patient Profile (%)",
+                      data: [
+                        norm(patientMap.mean_radius, maxVals.mean_radius),
+                        norm(patientMap.mean_texture, maxVals.mean_texture),
+                        norm(patientMap.mean_perimeter, maxVals.mean_perimeter),
+                        norm(patientMap.mean_area, maxVals.mean_area),
+                        norm(
+                          patientMap.mean_smoothness,
+                          maxVals.mean_smoothness
+                        ),
+                      ],
+                      borderColor: "#db2777",
+                      backgroundColor: "rgba(219, 39, 119, 0.2)",
+                    },
+                  ],
+                },
+                options: {
+                  maintainAspectRatio: false,
+                  scales: {
+                    r: { min: 0, max: 100, ticks: { display: false } },
+                  },
+                },
+              }
+            );
+
+            loadHistory();
+            document
+              .getElementById("resultBox")
+              .scrollIntoView({ behavior: "smooth" });
+          } catch (err) {
+            alert(err.message);
+          } finally {
+            loader.style.display = "none";
+          }
+        });
+
+      // --- BATCH UPLOAD LOGIC ---
+      function setupUpload() {
+        const zone = document.getElementById("dropZone");
+        const input = document.getElementById("csvFileInput");
+
+        zone.addEventListener("click", () => input.click());
+        input.addEventListener("change", (e) => handleFiles(e.target.files));
+
+        zone.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          zone.classList.add("dragover");
+        });
+        zone.addEventListener("dragleave", () =>
+          zone.classList.remove("dragover")
+        );
+        zone.addEventListener("drop", (e) => {
+          e.preventDefault();
+          zone.classList.remove("dragover");
+          handleFiles(e.dataTransfer.files);
+        });
+      }
+
+      async function handleFiles(files) {
+        if (files.length === 0) return;
+        const file = files[0];
+
+        const loader = document.getElementById("loadingIndicator");
+        document.getElementById("loadingText").textContent =
+          "Batch Processing CSV...";
+        loader.style.display = "flex";
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const res = await fetch(`${API_URL}/predict_csv`, {
+            method: "POST",
+            body: formData,
+          });
+          if (!res.ok)
+            throw new Error((await res.json()).error || "Upload failed");
+
+          const base64Data = await res.text(); // Returns base64 string directly
+
+          // Download Trigger
+          const link = document.createElement("a");
+          link.href = "data:text/csv;base64," + base64Data;
+          link.download = "OncoPredict_Results.csv";
+          link.click();
+          alert("Batch processing complete! Downloading results...");
+        } catch (err) {
+          alert(err.message);
+        } finally {
+          loader.style.display = "none";
+          document.getElementById("loadingText").textContent = "Processing...";
+        }
+      }
+
+      function downloadTemplate() {
+        const headers = features.join(",");
+        const blob = new Blob([headers], { type: "text/csv" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "template.csv";
+        a.click();
+      }
+
+      // --- PDF GEN ---
+      async function generatePDF() {
+        document.getElementById("pdfReady").style.display = "none";
+        document.getElementById("pdfProcessing").style.display = "block";
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF();
+        const width = pdf.internal.pageSize.getWidth();
+
+        pdf.setFillColor(15, 23, 42);
+        pdf.rect(0, 0, width, 40, "F");
+        pdf.setTextColor(255);
+        pdf.setFontSize(22);
+        pdf.text("OncoPredict Report", 15, 20);
+        pdf.setFontSize(10);
+        pdf.text(`Generated: ${new Date().toLocaleString()}`, 15, 30);
+
+        let y = 55;
+        pdf.setTextColor(0);
+        pdf.setFontSize(16);
+        const isMal = lastPrediction.label === "Malignant";
+        pdf.text(`PREDICTION: ${lastPrediction.label.toUpperCase()}`, 15, y);
+        pdf.setFontSize(12);
+        pdf.text(
+          `Confidence: ${(lastPrediction.probability * 100).toFixed(1)}%`,
+          15,
+          y + 8
+        );
+        y += 20;
+
+        // Table
+        pdf.setFontSize(14);
+        pdf.text("Clinical Data", 15, y);
+        y += 10;
+        pdf.setFontSize(8);
+        let x = 15,
+          startY = y;
+        for (let i = 0; i < features.length; i++) {
+          let name = features[i].replace(/_/g, " ").replace("mean", "").trim();
+          pdf.text(`${name}: ${patientInputValues[i]}`, x, y);
+          y += 6;
+          if ((i + 1) % 10 === 0) {
+            x += 60;
+            y = startY;
+          }
+        }
+        y = startY + 70;
+
+        // Visuals
+        const chartIds = ["confidenceChart", "featureChart", "comparisonChart"];
+        const tabIds = ["overview", "features", "comparison"];
+        for (let i = 0; i < chartIds.length; i++) {
+          const tab = document.getElementById(tabIds[i]);
+          const wasHidden = tab.style.display === "none";
+          if (wasHidden) tab.style.display = "block";
+
+          const cvs = document.getElementById(chartIds[i]);
+          const ctx = cvs.getContext("2d");
+          ctx.save();
+          ctx.globalCompositeOperation = "destination-over";
+          ctx.fillStyle = "white";
+          ctx.fillRect(0, 0, cvs.width, cvs.height);
+          ctx.restore();
+
+          pdf.addImage(cvs.toDataURL("image/png"), "PNG", 15, y, 80, 50);
+          if (wasHidden) tab.style.display = "none";
+        }
+
+        if (lastPrediction.explanation_image) {
+          pdf.addPage();
+          pdf.text("AI Reasoning (SHAP)", 15, 20);
+          pdf.addImage(
+            "data:image/png;base64," + lastPrediction.explanation_image,
+            "PNG",
+            15,
+            30,
+            180,
+            100
+          );
+        }
+
+        pdf.save("OncoPredict_Report.pdf");
+        document.getElementById("pdfModal").style.display = "none";
+      }
+
+      init();
+    </script>
+  </body>
+</html>
